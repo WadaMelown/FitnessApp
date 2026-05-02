@@ -116,13 +116,24 @@ export default function MuscleMapScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Body Model */}
+        {/* Body Model with pinch-to-zoom */}
         <View style={styles.modelContainer}>
-          <BodyModelSVG
-            view={view}
-            selectedMuscle={selectedMuscle}
-            onMusclePress={handleMusclePress}
-          />
+          <ScrollView
+            style={styles.zoomScroll}
+            contentContainerStyle={styles.zoomContent}
+            maximumZoomScale={3}
+            minimumZoomScale={1}
+            centerContent
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            bouncesZoom
+          >
+            <BodyModelSVG
+              view={view}
+              selectedMuscle={selectedMuscle}
+              onMusclePress={handleMusclePress}
+            />
+          </ScrollView>
         </View>
 
         {/* Bottom hint */}
@@ -130,7 +141,10 @@ export default function MuscleMapScreen() {
           {selectedMuscle ? (
             <Text style={styles.hintSelected}>{getMuscleGroupName(selectedMuscle)}</Text>
           ) : (
-            <Text style={styles.hint}>Tap any labelled region</Text>
+            <View style={styles.hintRow}>
+              <Ionicons name="search-outline" size={13} color={Colors.muted} />
+              <Text style={styles.hint}>Tap a muscle · Pinch to zoom</Text>
+            </View>
           )}
         </View>
 
@@ -302,8 +316,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + '60',
   },
   levelChipText: { fontSize: 13, fontWeight: '600', color: Colors.accentLight },
-  modelContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  hintBar: { paddingBottom: 12 },
+  modelContainer: { flex: 1, width: '100%' },
+  zoomScroll: { flex: 1, width: '100%' },
+  zoomContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
+  hintBar: { paddingBottom: 12, alignItems: 'center' },
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   hint: { fontSize: 13, color: Colors.muted },
   hintSelected: { fontSize: 14, fontWeight: '700', color: Colors.accentLight },
   // Settings modal
