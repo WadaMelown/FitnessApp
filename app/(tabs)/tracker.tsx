@@ -5,12 +5,11 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import WorkoutLogger from '@/components/tracker/WorkoutLogger';
-import AIChat from '@/components/tracker/AIChat';
 import ProgressHistory from '@/components/tracker/ProgressHistory';
 import { getRecentWorkouts, getSetting, getWeeklyVolume, WeeklyVolumeEntry, WorkoutEntry } from '@/lib/database';
 import { getMuscleGroupName } from '@/lib/exercises';
 
-type Tab = 'log' | 'history' | 'chat';
+type Tab = 'log' | 'history';
 
 export default function TrackerScreen() {
   const params = useLocalSearchParams<{
@@ -50,9 +49,8 @@ export default function TrackerScreen() {
   };
 
   const TABS: { id: Tab; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
-    { id: 'log',     label: 'Log',      icon: 'add-circle-outline' },
+    { id: 'log',     label: 'Log',      icon: 'add-circle-outline'  },
     { id: 'history', label: 'Progress', icon: 'trending-up-outline' },
-    { id: 'chat',    label: 'AI Coach', icon: 'sparkles-outline'   },
   ];
 
   const todayMuscles = [...new Set(todayWorkouts.map(w => w.muscleGroup))];
@@ -154,7 +152,7 @@ export default function TrackerScreen() {
             />
           )}
           {activeTab === 'history' && <ProgressHistory />}
-          {activeTab === 'chat' && <AIChat />}
+          {activeTab === 'history' && <ProgressHistory />}
         </View>
       </View>
     </SafeAreaView>

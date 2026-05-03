@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-  Modal, Pressable, TextInput, Switch, Alert, ScrollView,
+  Modal, Pressable, Alert, ScrollView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,18 +13,26 @@ import { useTrackerStore, TrackerState } from '@/store/useTrackerStore';
 import { getSetting, setSetting } from '@/lib/database';
 import { router } from 'expo-router';
 
+const LEVELS: Level[] = ['beginner', 'intermediate', 'advanced'];
+const LEVEL_LABELS: Record<Level, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+const LEVEL_COLORS: Record<Level, string> = { beginner: Colors.success, intermediate: Colors.warning, advanced: Colors.danger };
+
 export default function MuscleMapScreen() {
   const [view, setView] = useState<BodyView>('front');
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
   const [level, setLevel] = useState<Level>('beginner');
+  const [isMale, setIsMale] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const addWorkout = useTrackerStore((s: TrackerState) => s.addWorkout);
 
-  // Load saved level preference
   useEffect(() => {
-    getSetting('fitnessLevel').then(saved => {
-      if (saved) setLevel(saved as Level);
+    Promise.all([
+      getSetting('fitnessLevel'),
+      getSetting('userGender'),
+    ]).then(([savedLevel, savedGender]) => {
+      if (savedLevel) setLevel(savedLevel as Level);
+      if (savedGender) setIsMale(savedGender !== 'female');
     });
   }, []);
 
@@ -45,6 +53,21 @@ export default function MuscleMapScreen() {
     setSetting('fitnessLevel', newLevel);
   }, []);
 
+  const handleGenderToggle = useCallback(() => {
+    Haptics.selectionAsync();
+    setIsMale(m => {
+      const next = !m;
+      setSetting('userGender', next ? 'male' : 'female');
+      return next;
+    });
+  }, []);
+
+  const handleViewToggle = useCallback((v: BodyView) => {
+    Haptics.selectionAsync();
+    setView(v);
+    setSelectedMuscle(null);
+  }, []);
+
   const handleLogExercise = useCallback((exercise: Exercise) => {
     if (!selectedMuscle) return;
     setModalVisible(false);
@@ -62,61 +85,27 @@ export default function MuscleMapScreen() {
 
   const exercises = selectedMuscle ? getExercisesForMuscle(selectedMuscle, level) : [];
 
-  const LEVEL_LABELS: Record<Level, string> = {
-    beginner: 'Beginner',
-    intermediate: 'Intermediate',
-    advanced: 'Advanced',
-  };
-
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
 
-        {/* Header */}
+        {/* ── HEADER ── */}
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Muscle Map</Text>
             <Text style={styles.subtitle}>Tap a muscle to explore</Text>
           </View>
-          <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsVisible(true)}>
-            <Ionicons name="settings-outline" size={20} color={Colors.subtext} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Controls row */}
-        <View style={styles.controlsRow}>
-          {/* Front/Back toggle */}
-          <View style={styles.toggle}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, view === 'front' && styles.toggleActive]}
-              onPress={() => { Haptics.selectionAsync(); setView('front'); }}
-            >
-              <Text style={[styles.toggleText, view === 'front' && styles.toggleTextActive]}>Front</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.iconBtn} onPress={handleGenderToggle}>
+              <Text style={styles.genderIcon}>{isMale ? '♂' : '♀'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, view === 'back' && styles.toggleActive]}
-              onPress={() => { Haptics.selectionAsync(); setView('back'); }}
-            >
-              <Text style={[styles.toggleText, view === 'back' && styles.toggleTextActive]}>Back</Text>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => setSettingsVisible(true)}>
+              <Ionicons name="settings-outline" size={19} color={Colors.subtext} />
             </TouchableOpacity>
           </View>
-
-          {/* Level indicator */}
-          <TouchableOpacity
-            style={styles.levelChip}
-            onPress={() => {
-              const levels: Level[] = ['beginner', 'intermediate', 'advanced'];
-              const next = levels[(levels.indexOf(level) + 1) % 3];
-              handleLevelChange(next);
-            }}
-          >
-            <Ionicons name="fitness-outline" size={14} color={Colors.accent} />
-            <Text style={styles.levelChipText}>{LEVEL_LABELS[level]}</Text>
-            <Ionicons name="swap-horizontal-outline" size={12} color={Colors.subtext} />
-          </TouchableOpacity>
         </View>
 
-        {/* Body Model with pinch-to-zoom */}
+        {/* ── BODY MODEL ── */}
         <View style={styles.modelContainer}>
           <ScrollView
             style={styles.zoomScroll}
@@ -130,25 +119,58 @@ export default function MuscleMapScreen() {
           >
             <BodyModelSVG
               view={view}
+              isMale={isMale}
               selectedMuscle={selectedMuscle}
               onMusclePress={handleMusclePress}
             />
           </ScrollView>
         </View>
 
-        {/* Bottom hint */}
-        <View style={styles.hintBar}>
-          {selectedMuscle ? (
-            <Text style={styles.hintSelected}>{getMuscleGroupName(selectedMuscle)}</Text>
-          ) : (
-            <View style={styles.hintRow}>
-              <Ionicons name="search-outline" size={13} color={Colors.muted} />
-              <Text style={styles.hint}>Tap a muscle · Pinch to zoom</Text>
-            </View>
-          )}
+        {/* ── BOTTOM CONTROLS ── */}
+        <View style={styles.bottomBar}>
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              style={[styles.viewBtn, view === 'front' && styles.viewBtnActive]}
+              onPress={() => handleViewToggle('front')}
+            >
+              <Text style={[styles.viewBtnText, view === 'front' && styles.viewBtnTextActive]}>Front</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewBtn, view === 'back' && styles.viewBtnActive]}
+              onPress={() => handleViewToggle('back')}
+            >
+              <Text style={[styles.viewBtnText, view === 'back' && styles.viewBtnTextActive]}>Back</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.levelRow}>
+            {LEVELS.map(l => (
+              <TouchableOpacity
+                key={l}
+                style={[styles.levelPill, level === l && { backgroundColor: LEVEL_COLORS[l] + '22', borderColor: LEVEL_COLORS[l] }]}
+                onPress={() => handleLevelChange(l)}
+              >
+                <View style={[styles.levelDot, { backgroundColor: LEVEL_COLORS[l] }]} />
+                <Text style={[styles.levelPillText, level === l && { color: LEVEL_COLORS[l] }]}>
+                  {LEVEL_LABELS[l]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.hintRow}>
+            {selectedMuscle ? (
+              <Text style={styles.hintSelected}>{getMuscleGroupName(selectedMuscle)}</Text>
+            ) : (
+              <>
+                <Ionicons name="hand-left-outline" size={12} color={Colors.muted} />
+                <Text style={styles.hint}>Tap a muscle · Pinch to zoom</Text>
+              </>
+            )}
+          </View>
         </View>
 
-        {/* Exercise Modal */}
+        {/* ── EXERCISE MODAL ── */}
         {selectedMuscle && (
           <ExerciseModal
             visible={modalVisible}
@@ -161,7 +183,6 @@ export default function MuscleMapScreen() {
           />
         )}
 
-        {/* Settings Modal */}
         <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
       </View>
     </SafeAreaView>
@@ -169,27 +190,8 @@ export default function MuscleMapScreen() {
 }
 
 function SettingsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const [apiKey, setApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      getSetting('anthropicApiKey').then(k => setApiKey(k ?? ''));
-    }
-  }, [visible]);
-
-  const save = async () => {
-    setSaving(true);
-    await setSetting('anthropicApiKey', apiKey.trim());
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSaving(false);
-    onClose();
-    Alert.alert('Saved', 'Settings updated. Restart the app for the API key to take effect.');
-  };
-
-  const resetOnboarding = async () => {
-    Alert.alert('Reset Onboarding', 'This will restart the onboarding flow next time the app opens. Continue?', [
+  const resetOnboarding = () => {
+    Alert.alert('Reset Onboarding', 'This will restart the setup flow. Continue?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Reset', style: 'destructive', onPress: async () => {
@@ -212,178 +214,78 @@ function SettingsModal({ visible, onClose }: { visible: boolean; onClose: () => 
             <Ionicons name="close" size={20} color={Colors.subtext} />
           </TouchableOpacity>
         </View>
-
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <SectionHead>AI Coach</SectionHead>
-          <Text style={styles.settingDesc}>
-            Enter your Anthropic API key to enable the AI fitness coach. Get one free at console.anthropic.com
-          </Text>
-          <View style={styles.apiKeyRow}>
-            <TextInput
-              style={styles.apiKeyInput}
-              value={apiKey}
-              onChangeText={setApiKey}
-              placeholder="sk-ant-..."
-              placeholderTextColor={Colors.muted}
-              secureTextEntry={!showKey}
-              autoCapitalize="none"
-              autoCorrect={false}
-              selectionColor={Colors.accent}
-            />
-            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowKey(s => !s)}>
-              <Ionicons name={showKey ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.subtext} />
-            </TouchableOpacity>
-          </View>
-
-          <SectionHead>Account</SectionHead>
-          <TouchableOpacity style={styles.dangerBtn} onPress={resetOnboarding}>
-            <Ionicons name="refresh-outline" size={16} color={Colors.danger} />
-            <Text style={styles.dangerBtnText}>Redo onboarding</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.saveSettingsBtn, saving && { opacity: 0.6 }]}
-            onPress={save}
-            disabled={saving}
-          >
-            <Text style={styles.saveSettingsBtnText}>{saving ? 'Saving...' : 'Save Settings'}</Text>
-          </TouchableOpacity>
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
+        <Text style={styles.sectionHead}>Account</Text>
+        <TouchableOpacity style={styles.dangerBtn} onPress={resetOnboarding}>
+          <Ionicons name="refresh-outline" size={16} color={Colors.danger} />
+          <Text style={styles.dangerBtnText}>Redo onboarding</Text>
+        </TouchableOpacity>
+        <View style={{ height: 40 }} />
       </View>
     </Modal>
   );
 }
 
-function SectionHead({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.sectionHead}>{children}</Text>;
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1, alignItems: 'center' },
+  container: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8,
   },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.text, letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, color: Colors.subtext, marginTop: 2 },
-  settingsBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+  title: { fontSize: 24, fontWeight: '800', color: Colors.text, letterSpacing: -0.5 },
+  subtitle: { fontSize: 12, color: Colors.subtext, marginTop: 2 },
+  headerRight: { flexDirection: 'row', gap: 8 },
+  iconBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
-    marginBottom: 8,
-    width: '100%',
-  },
-  toggle: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  toggleBtn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 10 },
-  toggleActive: { backgroundColor: Colors.accent },
-  toggleText: { fontSize: 14, fontWeight: '600', color: Colors.subtext },
-  toggleTextActive: { color: Colors.white },
-  levelChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.accentDim,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: Colors.accent + '60',
-  },
-  levelChipText: { fontSize: 13, fontWeight: '600', color: Colors.accentLight },
+  genderIcon: { fontSize: 20, color: Colors.accentLight, fontWeight: '700' },
   modelContainer: { flex: 1, width: '100%' },
   zoomScroll: { flex: 1, width: '100%' },
   zoomContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
-  hintBar: { paddingBottom: 12, alignItems: 'center' },
-  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  hint: { fontSize: 13, color: Colors.muted },
-  hintSelected: { fontSize: 14, fontWeight: '700', color: Colors.accentLight },
-  // Settings modal
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  bottomBar: {
+    paddingHorizontal: 16, paddingBottom: 12, paddingTop: 10, gap: 10,
+    borderTopWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
+  },
+  viewToggle: {
+    flexDirection: 'row', backgroundColor: Colors.card,
+    borderRadius: 14, padding: 4, borderWidth: 1, borderColor: Colors.border,
+    alignSelf: 'center',
+  },
+  viewBtn: { paddingHorizontal: 30, paddingVertical: 9, borderRadius: 11 },
+  viewBtnActive: { backgroundColor: Colors.accent },
+  viewBtnText: { fontSize: 14, fontWeight: '600', color: Colors.subtext },
+  viewBtnTextActive: { color: Colors.white },
+  levelRow: { flexDirection: 'row', gap: 8 },
+  levelPill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, paddingVertical: 7, borderRadius: 10,
+    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.card,
+  },
+  levelDot: { width: 6, height: 6, borderRadius: 3 },
+  levelPillText: { fontSize: 11, fontWeight: '700', color: Colors.subtext },
+  hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  hint: { fontSize: 12, color: Colors.muted },
+  hintSelected: { fontSize: 13, fontWeight: '700', color: Colors.accentLight },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' } as any,
   settingsSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '75%',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderColor: Colors.border,
   },
-  sheetHandle: {
-    width: 40, height: 4, backgroundColor: Colors.border,
-    borderRadius: 2, alignSelf: 'center', marginBottom: 16,
-  },
-  sheetHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 20,
-  },
+  sheetHandle: { width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   sheetTitle: { fontSize: 20, fontWeight: '700', color: Colors.text },
   closeBtn: {
     width: 34, height: 34, borderRadius: 17,
     backgroundColor: Colors.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.border,
   },
-  sectionHead: {
-    fontSize: 11, fontWeight: '700', color: Colors.subtext,
-    letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 20, marginBottom: 10,
-  },
-  settingDesc: { fontSize: 13, color: Colors.subtext, lineHeight: 18, marginBottom: 10 },
-  apiKeyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  apiKeyInput: {
-    flex: 1,
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    color: Colors.text,
-    fontSize: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: 'monospace',
-  },
-  eyeBtn: { padding: 10 },
+  sectionHead: { fontSize: 11, fontWeight: '700', color: Colors.subtext, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
   dangerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.danger + '15',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.danger + '40',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.danger + '15', borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: Colors.danger + '40',
   },
   dangerBtnText: { fontSize: 14, fontWeight: '600', color: Colors.danger },
-  saveSettingsBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  saveSettingsBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
 });

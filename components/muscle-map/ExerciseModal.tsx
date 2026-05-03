@@ -151,10 +151,7 @@ export default function ExerciseModal({
                   </View>
                 </View>
                 {tips.formCues.map((cue, i) => (
-                  <View key={i} style={styles.tipRow}>
-                    <View style={[styles.tipNum, { backgroundColor: Colors.success + '20', borderColor: Colors.success + '50' }]}>
-                      <Text style={[styles.tipNumText, { color: Colors.success }]}>{i + 1}</Text>
-                    </View>
+                  <View key={i} style={[styles.tipRow, { borderLeftColor: Colors.success }]}>
                     <Text style={styles.tipText}>{cue}</Text>
                   </View>
                 ))}
@@ -171,24 +168,13 @@ export default function ExerciseModal({
                   </View>
                 </View>
                 {tips.maximizeTips.map((tip, i) => (
-                  <View key={i} style={styles.tipRow}>
-                    <View style={[styles.tipNum, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning + '50' }]}>
-                      <Text style={[styles.tipNumText, { color: Colors.warning }]}>{i + 1}</Text>
-                    </View>
+                  <View key={i} style={[styles.tipRow, { borderLeftColor: Colors.warning }]}>
                     <Text style={styles.tipText}>{tip}</Text>
                   </View>
                 ))}
               </View>
 
-              {/* YouTube for muscle */}
-              <TouchableOpacity
-                style={styles.ytRow}
-                onPress={() => openYoutube(`${muscleName} workout tips technique`)}
-              >
-                <Ionicons name="logo-youtube" size={20} color="#FF3333" />
-                <Text style={styles.ytRowText}>Watch {muscleName} technique videos</Text>
-                <Ionicons name="chevron-forward" size={16} color={Colors.subtext} />
-              </TouchableOpacity>
+              {/* removed per-muscle YouTube row — kept per-exercise only */}
             </>
           )}
 
@@ -323,13 +309,10 @@ const styles = StyleSheet.create({
   tipsIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   tipsCardTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
   tipsCardSub: { fontSize: 12, color: Colors.subtext, marginTop: 1 },
-  tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 9 },
-  tipNum: {
-    width: 22, height: 22, borderRadius: 6,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, flexShrink: 0, marginTop: 1,
+  tipRow: {
+    borderLeftWidth: 3, paddingLeft: 10, marginBottom: 9,
+    borderRadius: 2,
   },
-  tipNumText: { fontSize: 11, fontWeight: '800' },
   tipText: { fontSize: 14, color: Colors.text, lineHeight: 20, flex: 1 },
   ytRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
